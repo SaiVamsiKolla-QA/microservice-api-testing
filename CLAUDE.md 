@@ -116,6 +116,12 @@ Dependency Management
 * `Poetry` (use `poetry add <pkg>`)
 * `poetry.lock` is committed
 * Run commands via `poetry run <cmd>`
+* Dependency groups:
+    * **main** — runtime deps imported by `adapters/`, `framework/`, `models/`
+      (e.g. httpx, pydantic, python-dotenv, jsonschema)
+    * **dev** — only used at test/development time, never imported by
+      framework code (e.g. pytest, schemathesis, allure-pytest, ruff, mypy)
+    * Use `poetry add <pkg>` for main and `poetry add --group dev <pkg>` for dev
 
 Do not introduce new frameworks without approval.
 

@@ -1,7 +1,7 @@
 [project]
 name = "microservice-api-testing"
 version = "0.1.0"
-description = ""
+description = "Production-quality API testing framework for microservices"
 authors = [
     {name = "VamsiKolla-QA",email = "saivamsikolla@gmail.com"}
 ]
