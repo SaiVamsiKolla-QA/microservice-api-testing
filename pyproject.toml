@@ -26,3 +26,36 @@ dev = [
     "ruff (>=0.15.12,<0.16.0)",
     "mypy (>=1.20.2,<2.0.0)"
 ]
+
+[tool.ruff]
+target-version = "py312"
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM"]
+
+[tool.ruff.format]
+# ruff formatter defaults — intentionally left unconfigured
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+warn_unused_configs = true
+warn_redundant_casts = true
+warn_unused_ignores = true
+disallow_any_unimported = true
+exclude = ["\\.venv", "runs"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-v --strict-markers --tb=short"
+markers = [
+    "smoke: Health, auth, and basic reachability checks — run on every PR and in CI",
+    "contract: Schemathesis validation against specs/*.yaml — run on every PR and in CI",
+    "integration: Chained flows across resources/services — run nightly",
+    "fuzz: Schemathesis property-based + Hypothesis fuzzing — run nightly",
+]
+log_cli = true
+log_cli_level = "INFO"
+log_cli_format = "%(asctime)s %(levelname)-8s %(name)s %(message)s"
+log_cli_date_format = "%Y-%m-%d %H:%M:%S"
