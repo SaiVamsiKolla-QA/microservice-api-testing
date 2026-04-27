@@ -1,0 +1,630 @@
+# Microservice API Testing Framework
+
+Production-quality API testing framework for microservices, built around
+**OOP client design, OpenAPI contract testing, and suite-based automation**.
+
+Learning vehicle: **Swagger Petstore** (`https://petstore.swagger.io/v2/swagger.json`).
+Petstore exercises the full framework — three resource clients (Pet, Store, User),
+a public OpenAPI spec, and stable endpoints — without the friction of needing
+real auth or private services.
+
+The architecture is designed to scale to 13+ real microservices once the
+patterns are proven on Petstore.
+
+OpenAPI specifications are version-controlled locally under `specs/`.
+
+---
+
+## Project Mission
+
+This is a **reusable, environment-aware API testing framework**. Petstore is
+the learning vehicle and proof case, but the architecture must scale to 13+
+real microservices without rewrites.
+
+Decisions are scored on two criteria:
+1. Does this reinforce production-grade Python and API testing patterns?
+2. Does this scale to 13+ microservices and to staging/prod environments
+   without architectural rewrites?
+
+Anything that fails BOTH criteria is wrong for this project.
+
+---
+
+## Current Status
+
+Stage 1 — Framework layer (in progress)
+Last updated: 2026-04-27
+
+Planned stages:
+
+0. ✅ Project scaffolding (Poetry, CLAUDE.md, README, branch protection,
+   directory tree, `.env.example`, `.gitignore`)
+1. 🏗️ Core framework — `framework/config.py`, `framework/logger.py`,
+   `adapters/exceptions.py`, `adapters/base.py` (raise-by-default + auth)
+2. Wire up Petstore — `adapters/pet.py`, `adapters/store.py`, `adapters/user.py`
+   + pydantic models + smoke tests for each resource
+3. Integration suite — chained calls (e.g. create Pet → place Order →
+   look up Order by Pet ID)
+4. Contract suite — Schemathesis loaded from local `specs/petstore.yaml`
+5. Fuzz suite — property-based fuzzing via Schemathesis + Hypothesis
+6. Allure reporting wired in; `scripts/run_suite.sh`, `scripts/signoff.py`,
+   `scripts/diff_specs.py`
+7. CI — GitHub Actions running smoke + contract on PR, full suite nightly
+8. Refactor pass — extract any duplicated logic into `framework/`,
+   ready the framework for real microservices
+
+---
+
+## Project Context
+
+Owner is a **Senior QA Engineer** building a portfolio-quality API testing
+framework. Petstore is the learning vehicle; the long-term target is a
+multi-service framework reusable across real microservices.
+
+Background
+
+* Manual QA, API testing (Postman), SQL, test strategy
+* Guidewire QA across PolicyCenter, BillingCenter, ClaimCenter
+* Python is a learning area — used at intermediate level, not advanced
+
+Guidelines when writing code:
+
+* Prefer **clarity over cleverness**
+* Add **short comments explaining non-obvious Python**
+* When introducing a new concept (fixtures, pydantic, parametrize,
+  Schemathesis hooks, Allure steps, raise-by-default), briefly explain
+  **why it is used**
+
+Keep explanations short (2–3 sentences).
+
+---
+
+## Tech Stack (Strict)
+
+Python 3.12+
+
+HTTP
+
+* `httpx` (synchronous client)
+
+Models
+
+* `pydantic v2` (request bodies, response validation, typed config helpers)
+
+Testing
+
+* `pytest`
+* `schemathesis` (OpenAPI contract + fuzz, loaded from local YAML)
+* `hypothesis` (transitive via Schemathesis; pinned for fuzz tuning)
+
+Reporting & Logging
+
+* `allure-pytest` (HTML reports, attachments, steps)
+* Python `logging` module (structured request/response logs with redaction)
+
+Configuration
+
+* `python-dotenv` — loads `.env.<ENV>` based on `ENV` variable
+
+Code quality
+
+* `ruff` (lint + format)
+* `mypy --strict`
+
+Dependency Management
+
+* `Poetry` (use `poetry add <pkg>`)
+* `poetry.lock` is committed
+* Run commands via `poetry run <cmd>`
+
+Do not introduce new frameworks without approval.
+
+Forbidden tools
+
+* `requests` — using `httpx` for type-safe, modern HTTP and consistency
+* `pip install` — Poetry manages dependencies; mixing breaks the lockfile
+* `requirements.txt` — replaced by `pyproject.toml`
+* `unittest` — pytest is the project standard
+* `Flask`, `FastAPI` — not building a server
+* `selenium`, `playwright` — this is an API framework, not a UI framework
+* async code — not part of current learning goals
+* Live OpenAPI URLs in Schemathesis — specs must come from `specs/*.yaml`
+* Live prod calls — `runs/prod/` is a placeholder; this repo never hits prod
+
+---
+
+## Environments
+
+The framework loads config based on the `ENV` environment variable.
+
+* `ENV=qa` (default) → `.env.qa` — points at Petstore for now
+* `ENV=stg` → `.env.stg` (placeholder; not active yet)
+* `ENV=prod` → `.env.prod` (placeholder; not active yet)
+
+Run examples
+
+```
+ENV=qa poetry run pytest -m smoke
+ENV=qa poetry run pytest -m integration
+```
+
+Per-env outputs land under `runs/<env>/`:
+
+```
+runs/qa/allure-results/
+runs/qa/api_tests.log
+```
+
+`stg/` and `prod/` directories exist only as placeholders for future use.
+
+---
+
+## Architecture
+
+```
+microservice-api-testing/
+├── adapters/
+│   ├── base.py              # BaseAPIClient (httpx, auth, raise_for_status logic)
+│   ├── exceptions.py        # Custom API exception hierarchy
+│   ├── pet.py               # PetClient — Pet resource
+│   ├── store.py             # StoreClient — Store resource
+│   └── user.py              # UserClient — User resource
+│
+├── framework/
+│   ├── config.py            # .env.<ENV> loader, singleton accessor
+│   ├── logger.py            # Structured request/response logging + redaction
+│   ├── assertions.py        # Reusable assertions (status, schema, latency)
+│   ├── reporting.py         # Allure attachment helpers
+│   └── schema.py            # JSON Schema validation helpers
+│
+├── models/
+│   ├── pet_models.py        # pydantic models mirroring Petstore Pet schema
+│   ├── store_models.py      # Order, Inventory
+│   └── user_models.py       # User
+│
+├── specs/
+│   └── petstore.yaml        # Local copy of Petstore OpenAPI spec
+│
+├── scripts/
+│   ├── run_suite.sh         # ENV=qa ./scripts/run_suite.sh smoke
+│   ├── diff_specs.py        # Detect breaking changes between spec versions
+│   └── signoff.py           # Generate release sign-off summary from Allure
+│
+├── testdata/
+│   ├── pets.json
+│   ├── orders.json
+│   └── expected_schemas/    # JSON Schema files for response validation
+│
+├── tests/
+│   ├── conftest.py          # Fixtures: config, logger, clients
+│   ├── smoke/               # @pytest.mark.smoke
+│   ├── integration/         # @pytest.mark.integration (chained flows)
+│   ├── contract/            # @pytest.mark.contract (Schemathesis)
+│   └── fuzz/                # @pytest.mark.fuzz (Schemathesis + Hypothesis)
+│
+├── runs/
+│   ├── qa/                  # active
+│   ├── stg/                 # placeholder
+│   └── prod/                # placeholder
+│
+├── docs/
+│   ├── architecture.md
+│   └── test-strategy.md
+│
+├── .env.example             # committed
+├── .env.qa                  # gitignored
+├── pyproject.toml
+├── poetry.lock
+├── pytest.ini
+├── README.md
+└── CLAUDE.md
+```
+
+---
+
+## Layer Responsibilities
+
+### `framework/config.py`
+
+Single source of truth for environment configuration.
+
+Responsibilities
+
+* Read `ENV` variable (default `qa`)
+* Load `.env.<ENV>` via `python-dotenv`
+* Expose typed values: `base_url`, `bearer_token`, `api_key`,
+  `api_key_header`, `timeout`, `log_level`
+* Fail fast on missing required values (e.g. `BASE_URL`)
+* Provide a `get_config()` module-level singleton so import-time consumers
+  (Schemathesis, scripts) get the same config instance as fixtures
+
+---
+
+### `framework/logger.py`
+
+Structured logging shared across the framework.
+
+Captures for every API call
+
+* request method + URL
+* request payload (truncated)
+* response status code
+* response body (truncated)
+* response time (ms)
+
+**Redaction (mandatory)**
+
+* `Authorization` header values are replaced with `***REDACTED***`
+* The configured `API_KEY_HEADER` value is replaced with `***REDACTED***`
+* Bearer tokens or API keys must never appear in `runs/<env>/api_tests.log`
+
+Outputs
+
+* Console (INFO+)
+* Rotating file at `runs/<env>/api_tests.log`
+
+Single named logger (`api_testing`), configured once. Plain-text format —
+human-grep-friendly. Allure attachments handle structured-data needs.
+
+---
+
+### `adapters/base.py` & `adapters/exceptions.py`
+
+The client layer follows a **fail-fast philosophy**.
+
+* **Raise-by-default** — every method calls `response.raise_for_status()`
+  by default, mapping HTTP errors to typed exceptions
+* **Custom exceptions** — HTTP status codes are mapped to typed exceptions
+  in `adapters/exceptions.py`:
+
+```
+APIClientError          # base
+APIAuthError            # 401, 403
+APINotFoundError        # 404
+APIValidationError      # 4xx with body validation issue
+APITransportError       # connection / timeout
+```
+
+* **Auth injection** — Bearer token AND/OR API key are injected from config.
+  Both can coexist; an empty env value omits the header
+* **Override for negative testing** — every endpoint method accepts
+  `raise_for_status: bool = True`. Tests verifying expected 4xx/5xx
+  responses pass `raise_for_status=False` and assert on the response object
+
+Expose main entrypoint
+
+```python
+class BaseAPIClient:
+    def __init__(self, base_url: str, service_name: str) -> None: ...
+    def get(self, path: str, *, raise_for_status: bool = True, **kwargs) -> httpx.Response: ...
+    def post(self, path: str, *, raise_for_status: bool = True, **kwargs) -> httpx.Response: ...
+    # put / patch / delete
+    def close(self) -> None: ...
+```
+
+Why raise-by-default: forces tests to either succeed cleanly or *explicitly*
+opt in to checking failure responses. Eliminates the ambiguity of "did this
+test pass because the call worked, or because nobody noticed it failed?"
+
+---
+
+### `adapters/<resource>.py`
+
+One class per Swagger tag. Inherits `BaseAPIClient`. Methods correspond to
+endpoints in that resource's section of the OpenAPI spec.
+
+Example
+
+```python
+class PetClient(BaseAPIClient):
+    def add_pet(self, pet: Pet, *, raise_for_status: bool = True) -> httpx.Response: ...
+    def get_pet(self, pet_id: int, *, raise_for_status: bool = True) -> httpx.Response: ...
+    def update_pet(self, pet: Pet, *, raise_for_status: bool = True) -> httpx.Response: ...
+    def delete_pet(self, pet_id: int, *, raise_for_status: bool = True) -> httpx.Response: ...
+```
+
+Responsibilities
+
+* Endpoint methods (one method per operation)
+* Request serialization via pydantic models
+* Response validation hooks (delegated to `framework/assertions.py` and
+  `framework/schema.py`)
+
+Tests interact with services **only through these clients** — never via
+raw `httpx`.
+
+Bad
+
+```python
+httpx.get("https://petstore.swagger.io/v2/pet/10")
+```
+
+Good
+
+```python
+pet_client.get_pet(10)
+```
+
+---
+
+### `models/`
+
+Pydantic v2 models mirroring Petstore schemas.
+
+Benefits
+
+* Request validation before sending
+* Response validation after receiving
+* Contract testing (compare response schema to model)
+* Type safety in tests
+
+---
+
+### `framework/assertions.py`
+
+Reusable, Allure-aware assertions
+
+* `assert_status(response, expected)`
+* `assert_response_time(response, max_ms)`
+* `assert_json_contains(response, key)`
+* `assert_json_equals(response, expected_dict)`
+* `assert_matches_schema(response, schema_name)`
+
+Each assertion wraps its check in an `allure.step(...)` block so failures
+appear as named steps in the report.
+
+---
+
+### `framework/schema.py`
+
+JSON Schema validation utilities. Loads expected schemas from
+`testdata/expected_schemas/<n>.json` and validates response payloads
+via `jsonschema`. Used by `assert_matches_schema`.
+
+---
+
+### `framework/reporting.py`
+
+Thin Allure helpers — `attach_text`, `attach_json`, `attach_response`. Keeps
+test code free of Allure boilerplate.
+
+---
+
+### `specs/`
+
+Local OpenAPI 3.x YAML files. Committed to the repo.
+Schemathesis loads from these paths — never from live `/openapi.json` URLs.
+
+When a spec updates, the YAML is updated via PR and `scripts/diff_specs.py`
+reports breaking changes before the contract suite runs.
+
+---
+
+### `tests/`
+
+Tests interact with the API **through the client layer**.
+
+Tests verify **behavior**, not HTTP implementation.
+
+Markers are explicit on every test — directory placement is for humans,
+markers are for tooling:
+
+```python
+@pytest.mark.smoke
+class TestPetSmoke: ...
+```
+
+---
+
+## Error Handling
+
+Never return `None` on API failure. Always raise typed exceptions from
+`adapters/exceptions.py`.
+
+For tests that *expect* a failure response, pass `raise_for_status=False`
+to the client method and assert on the response object directly:
+
+```python
+def test_get_nonexistent_pet_returns_404(pet_client):
+    response = pet_client.get_pet(999_999_999, raise_for_status=False)
+    assert_status(response, 404)
+```
+
+Explicit failures make negative testing and debugging easier.
+
+---
+
+## Coding Standards
+
+Type hints required everywhere. `mypy --strict` must pass.
+
+Naming conventions
+
+```
+snake_case          → functions, variables
+PascalCase          → classes
+UPPER_SNAKE_CASE    → module-level constants
+```
+
+Docstrings: Google style.
+
+Import order
+
+1. standard library
+2. third-party libraries
+3. local modules
+
+Ruff handles formatting and lint; do not hand-format imports.
+
+---
+
+## Testing Strategy
+
+Pytest with the AAA pattern.
+
+```
+Arrange
+Act
+Assert
+```
+
+### Test pyramid
+
+| Suite       | Marker        | Scope                                       | Frequency      |
+|-------------|---------------|---------------------------------------------|----------------|
+| smoke       | `smoke`       | Health, auth, basic reachability            | Every PR + CI  |
+| contract    | `contract`    | Schemathesis vs `specs/*.yaml`              | Every PR + CI  |
+| integration | `integration` | Chained flows across resources/services     | Nightly        |
+| fuzz        | `fuzz`        | Schemathesis property-based + Hypothesis    | Nightly        |
+
+Tests should cover
+
+* happy path
+* contract validation
+* negative responses (4xx) — using `raise_for_status=False`
+* edge cases (boundary values, empty payloads, malformed input)
+
+Client setup is handled through **pytest fixtures in `tests/conftest.py`**
+at session scope (one client per resource per run).
+
+### Integration & chained calls
+
+Integration tests pass data between resources or services (e.g. create a
+Pet → place an Order referencing that Pet → look up the Order).
+
+* **State management** — keep chains within a single test function or use
+  setup fixtures with explicit teardown
+* **Cleanliness** — tests focus on data flow; `BaseAPIClient` handles
+  transport and error raising
+* **Idempotency** — tests should not assume prior state in Petstore;
+  create the data they need, clean up if the API supports it
+
+---
+
+## Workflow Rules
+
+### Plan Mode
+
+For tasks touching multiple files
+
+1. Enter Plan Mode
+2. Show implementation plan
+3. Wait for approval before coding
+
+Example plan
+
+```
+1. Add BaseAPIClient skeleton in adapters/base.py
+2. Add exception hierarchy in adapters/exceptions.py
+3. Add raise-by-default + raise_for_status override
+4. Add bearer + API key auth injection
+5. Add inline request/response logging with redaction
+6. Add unit test against a mocked httpx transport
+```
+
+---
+
+### Small Diffs
+
+Default to small, reviewable diffs.
+
+If a change exceeds ~150 lines, pause and propose splitting it into smaller
+commits.
+
+---
+
+### Test Planning
+
+Before writing tests
+
+Generate a **test list first** and confirm.
+
+Example
+
+```
+Test Plan for PetClient (smoke)
+
+- test_add_pet_success
+- test_get_pet_success
+- test_get_pet_not_found_raises_APINotFoundError
+- test_get_pet_not_found_returns_404_when_raise_disabled
+- test_update_pet_success
+- test_delete_pet_success
+```
+
+---
+
+### Spec Changes
+
+When `specs/*.yaml` changes
+
+1. Run `poetry run python scripts/diff_specs.py <old> <new>`
+2. Review breaking changes
+3. Update affected client methods, models, and tests
+4. Re-run contract suite locally before pushing
+
+---
+
+## Quality Gate
+
+Before declaring a task complete run
+
+```
+make check
+```
+
+The Makefile will run
+
+```
+ruff check .
+ruff format --check .
+mypy .
+poetry run pytest -m smoke
+```
+
+Report results after running.
+
+Full suite (`smoke + contract + integration + fuzz`) runs in CI nightly,
+not per-commit.
+
+---
+
+## Security
+
+Never commit secrets.
+
+```
+.env.qa, .env.stg, .env.prod  → gitignored
+.env.example                  → committed
+```
+
+Bearer tokens and API keys are read from env at runtime. They are never
+written to logs (`framework/logger.py` redacts `Authorization` and the
+configured `API_KEY_HEADER` values before any log output).
+
+`runs/<env>/api_tests.log` may contain request paths and response bodies.
+The `runs/` directory is gitignored except for `.gitkeep` files.
+
+---
+
+## When Unsure
+
+If a requirement is unclear or conflicts with existing code
+
+**Stop and ask one specific question instead of guessing.**
+
+---
+
+## What This Project Is NOT
+
+This project is
+
+* not a UI testing framework
+* not a load testing framework (use k6 or Locust separately)
+* not a service mock — it tests real services
+* not a replacement for unit tests inside each microservice's own repo
+* not Petstore-specific — Petstore is the learning vehicle, not the target
+
+Primary goal is **a reusable, multi-service API testing framework with
+contract testing, structured logging, raise-by-default error handling,
+and per-environment isolation**.
