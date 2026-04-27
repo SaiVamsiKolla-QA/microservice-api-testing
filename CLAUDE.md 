@@ -3,7 +3,7 @@
 Production-quality API testing framework for microservices, built around
 **OOP client design, OpenAPI contract testing, and suite-based automation**.
 
-Learning vehicle: **Swagger Petstore** (`https://petstore.swagger.io/v2/swagger.json`).
+Learning vehicle: **Petstore v3 (OpenAPI 3.0)** (`https://petstore3.swagger.io/api/v3/openapi.json`).
 Petstore exercises the full framework — three resource clients (Pet, Store, User),
 a public OpenAPI spec, and stable endpoints — without the friction of needing
 real auth or private services.
@@ -347,7 +347,7 @@ raw `httpx`.
 Bad
 
 ```python
-httpx.get("https://petstore.swagger.io/v2/pet/10")
+httpx.get("https://petstore3.swagger.io/api/v3/pet/10")
 ```
 
 Good

@@ -1,0 +1,29 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.hypothesis/
+
+# Poetry / venv
+.venv/
+
+# Environment files (only .env.example is committed)
+.env
+.env.qa
+.env.stg
+.env.prod
+
+# Test outputs
+runs/*/allure-results/
+runs/*/allure-report/
+runs/*/api_tests.log*
+
+# IDE
+.vscode/
+.idea/
+
+# macOS
+.DS_Store
